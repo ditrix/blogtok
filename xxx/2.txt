@@ -1,0 +1,119 @@
+
+https://tokmakov.msk.ru/blog/item/596
+todo 
+RegisterController
+LoginCOntroller
+ForgotPasswordControll
+
+для пользования bootstrap   (как вариант cdn ???)
+> composer require laravel/ui
+> npm install && npm run dev
+упал компосер, не понра ему версия. продолжим на cdn
+
+создали  views/layout/site.blade.php
+
+      <!-- Этот блок расположен справа -->
+            <ul class="navbar-nav me-auto mb-2 mb-md-0">
+                @guest
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('auth.login') }}">Войти</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('auth.register') }}">Регистрация</a>
+                    </li>
+                @else
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('user.index') }}">Личный кабинет</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('auth.logout') }}">Выйти</a>
+                    </li>
+                @endif
+            </ul>
+-------------------------
+по посредникам (миддлварs)
+наши (по аунтефикации ) лежат в Kernel.php
+..
+ protected $routeMiddleware = [
+        'auth' => \App\Http\Middleware\Authenticate::class,
+   
+        'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+    ];
+...    
+в классах потомках мидлваров
+играемся с редиректами. 
+не аутентифицированых посылаем на форму логина
+class Authenticate extends Middleware
+{
+	...
+    protected function redirectTo($request)
+    {
+        if (! $request->expectsJson()) {
+            return route('auth.login');
+        }
+    }
+}
+аутентифированых - в кабинет
+class RedirectIfAuthenticated
+{
+	....
+    public function handle($request, Closure $next, $guard = null)
+    {
+        if (Auth::guard($guard)->check()) {
+
+			return redirect()->route('user.index');            
+        }
+
+        return $next($request);
+    }
+}
+
+---------- создание контроллера
+>php artisan make:controller Auth/RegisterController
+
+TODO: будем сравнивать с blog
+ php artisan make:controller Auth/LoginController
+
+ в общ. на один контроллер вешаем нескролько обработчиков в зависимости от пути и метода
+
+Route::get('/auth.login', 'Auth\LoginController@login')->name('auth.login');
+Route::post('/auth.autentificate', 'Auth\LoginController@autentificate')->name('auth.autentificate');
+Route::get('/auth.logout',  'Auth\LoginController@logout')->name('auth.logout');
+
+class LoginController ... {
+    public function login(){...
+        return redirect()->route('user.index'); // перенапр юзера в случ успеха
+    }
+    public function autentificate(Request $request){...}
+    public function logout(){...}
+      
+} 
+--------
+передача сообщ от контроллера в блейд
+пример
+код контроллера
+...
+return redirect()->route('auth.login')->with('success', 'Вы успешно зарегистрировались');
+
+код макета  (пример на панели бутстрап)
+@if ($message = Session::get('success'))  
+    <div class="alert alert-success alert-dismissible mt-0" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Закрыть">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    {{ $message }}
+    </div>
+@endif
+
+пример сообщения об ошибке
+код контроллера
+  ...return redirect()->route('auth.login')->withErrors('Неверный логин или пароль');
+код макета
+...  
+@if ($errors->any())
+<ul>
+@foreach ($errors->all() as $error)
+    <li>{{ $error }}</li>
+@endforeach
+</ul>                        
+@endif

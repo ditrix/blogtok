@@ -1,0 +1,143 @@
+-------------------------------  DATA STRUCTURE 
+
+NB!  
+0 вешался от сообщеиня PDOException::("could not find driver")
+лечил   искал и раскаментил строку c extention=php_pdo_mysql  (примерно так)
+далее sudo apt install php7.4-mysql
+перезагрущк апач  etc/init.d/apache2 restart
+profit!
+
+
+------------------------------- 
+php artisan make:model Category -m
+
+/database/migrations/*_create_categories_table.php
+
+...
+
+class CreateCategoriesTable extends Migration {
+
+    public function up() {
+        Schema::create('categories', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('parent_id')->nullable(false)->default(0);
+
+            $table->string('name', 100);                 // 
+            $table->string('slug', 100)->unique();       // 
+...            
+            $table->timestamps();
+        });
+    }
+
+...
+}
+
+
+-------------------------------  один-ко-многим (категория-посты)
+
+class CreatePostsTable extends Migration {
+
+   ...
+    public function up() {
+        Schema::create('posts', function (Blueprint $table) {
+            ....
+            // внешний ключ, ссылается на поле id таблицы categories
+            $table->foreign('category_id')
+                ->references('id')
+                ->on('categories')
+                ->nullOnDelete();
+            ....    
+         })
+    } 
+    ...      
+}
+
+
+------------------------------- связь многие ко многим
+таблица post-tag  - буферная
+
+> php artisan make:migration create_post_tag_table
+...
+....
+    public function up(){
+    ....
+    Schema::create('post_tag', function (Blueprint $table) {
+            $table->unsignedBigInteger('post_id');
+            $table->unsignedBigInteger('tag_id');
+            $table->timestamps();
+            // внешний ключ, ссылается на поле id таблицы posts
+            $table->foreign('post_id')
+                ->references('id')
+                ->on('posts')
+                ->onDelete('cascade');
+            // внешний ключ, ссылается на поле id таблицы tags
+            $table->foreign('tag_id')
+                ->references('id')
+                ->on('tags')
+                ->onDelete('cascade');
+            // составной первичный ключ
+            $table->primary(['post_id', 'tag_id']);
+            imestamps();
+        });
+    }
+NB! указываем и в моделях
+...
+class Post extends Model {
+    public function tags() {
+        return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+}
+...
+class Tag extends Model {
+    public function posts() {
+        return $this->belongsToMany(Post::class)->withTimestamps();;
+    }
+}
+
+----------------------------- FAKE DATA -----------------------------
+https://laravel.su/docs/5.2/seeding
+
+$ php artisan make:seeder CategoryTableSeeder
+ ....
+ public function run() {
+        // создать 12 категорий
+    factory(App\Category::class, 12)->create();
+}
+
+
+------
+отдельно для буферной таблицы  post <=> tag
+
+$ php artisan make:seeder PostTagTableSeeder
+
+...
+    public function run() {
+        // создать связи между постами и тегами
+        foreach(App\Post::all() as $post) {
+            foreach(App\Tag::all() as $tag) {
+                if (rand(1, 20) == 10) {
+                    $post->tags()->attach($tag->id);
+                }
+            }
+        }
+    }
+...
+
+
+
+php artisan make:seeder UserTableSeeder
+
+----------------------------------------
+опрпделение фабрик (используеміх в сидерах)
+$php artisan make:factory CategoryFactory --model=Category
+
+пример в UserFactory  (из коробки)
+
+в кучу все сводим в DatabaseSeeder.php
+
+$php artisan migrate:fresh --seed
+# plug&pray
+
+
+--------------------
+
